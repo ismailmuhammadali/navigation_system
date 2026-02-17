@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FAST Peshawar — Campus Navigation System</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0b0f1a;
+  --surface: #111827;
+  --surface2: #1a2236;
+  --border: #1f2d45;
+  --border-bright: #2e4068;
+  --text: #e2e8f0;
+  --text-muted: #64748b;
+  --text-dim: #94a3b8;
+  --accent: #3b82f6;
+  --accent-glow: rgba(59,130,246,0.25);
+  --green: #22c55e;
+  --green-glow: rgba(34,197,94,0.2);
+  --orange: #f59e0b;
+  --orange-glow: rgba(245,158,11,0.2);
+  --red: #ef4444;
+  --purple: #a855f7;
+  --cyan: #06b6d4;
+  --node-default: #1e3a5f;
+  --node-border: #3b82f6;
+  --node-visited-bfs: #1e4d2b;
+  --node-visited-ucs: #4d2b1e;
+  --node-path-bfs: #22c55e;
+  --node-path-ucs: #f59e0b;
+  --node-start: #7c3aed;
+  --node-end: #dc2626;
+}
+
+body {
+  font-family: 'Space Grotesk', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Background grid */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(59,130,246,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(59,130,246,0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.wrapper {
+  position: relative;
+  z-index: 1;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+/* ===== HEADER ===== */
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.header-left h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+.header-left h1 span { color: var(--accent); }
+.header-left p {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 0.2rem;
+  font-family: 'JetBrains Mono', monospace;
+}
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.7rem;
+  background: var(--surface2);
+  border: 1px solid var(--border-bright);
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--accent);
+  letter-spacing: 0.05em;
+}
+
+/* ===== LAYOUT ===== */
+.main-grid {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 1.25rem;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .main-grid { grid-template-columns: 1fr; }
+}
+
+/* ===== PANELS ===== */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+}
+.panel-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.dot-blue { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+.dot-green { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.dot-orange { background: var(--orange); box-shadow: 0 0 6px var(--orange); }
+.dot-purple { background: var(--purple); box-shadow: 0 0 6px var(--purple); }
+
+/* ===== CANVAS ===== */
+#canvas-wrap {
+  position: relative;
+  background: #080d17;
+  padding: 0;
+}
+canvas {
+  display: block;
+  width: 100%;
+  cursor: pointer;
+}
+
+/* ===== CONTROLS ===== */
+.controls {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.control-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.control-label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+  min-width: 40px;
+}
+select {
+  flex: 1;
+  background: var(--surface2);
+  border: 1px solid var(--border-bright);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 0.4rem 0.6rem;
+  font-size: 0.78rem;
+  font-family: 'Space Grotesk', sans-serif;
+  outline: none;
+  cursor: pointer;
+}
+select:focus { border-color: var(--accent); }
+
+.btn-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+.btn {
+  padding: 0.5rem 0.8rem;
+  border: none;
+  border-radius: 8px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+}
+.btn:hover { transform: translateY(-1px); }
+.btn:active { transform: translateY(0); }
+.btn-bfs {
+  background: var(--green-glow);
+  border: 1px solid var(--green);
+  color: var(--green);
+}
+.btn-bfs:hover { background: rgba(34,197,94,0.35); }
+.btn-ucs {
+  background: var(--orange-glow);
+  border: 1px solid var(--orange);
+  color: var(--orange);
+}
+.btn-ucs:hover { background: rgba(245,158,11,0.35); }
+.btn-both {
+  background: var(--accent-glow);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  grid-column: 1 / -1;
+}
+.btn-both:hover { background: rgba(59,130,246,0.35); }
+.btn-reset {
+  background: transparent;
+  border: 1px solid var(--border-bright);
+  color: var(--text-muted);
+  grid-column: 1 / -1;
+}
+.btn-reset:hover { border-color: var(--red); color: var(--red); }
+
+/* ===== LEGEND ===== */
+.legend {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem;
+  padding: 0 1rem 1rem;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.68rem;
+  color: var(--text-dim);
+}
+.legend-swatch {
+  width: 12px; height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+/* ===== RESULTS PANEL ===== */
+.results-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-top: 1.25rem;
+}
+.result-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.result-card-header {
+  padding: 0.6rem 1rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+}
+.result-card-header.bfs { background: var(--green-glow); color: var(--green); }
+.result-card-header.ucs { background: var(--orange-glow); color: var(--orange); }
+.result-body { padding: 1rem; }
+.result-metric { margin-bottom: 0.5rem; }
+.result-metric-label {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.result-metric-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-top: 0.1rem;
+}
+.result-metric-value.bfs { color: var(--green); }
+.result-metric-value.ucs { color: var(--orange); }
+.path-steps {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  line-height: 1.8;
+  margin-top: 0.5rem;
+}
+.path-step {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.15rem 0;
+}
+.path-step::before { content: '▸'; opacity: 0.5; }
+.path-step:first-child::before { content: '⬤'; opacity: 0.8; }
+.path-step:last-child::before { content: '⬛'; opacity: 0.8; }
+
+/* ===== COMPARISON CARD ===== */
+.comparison-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem;
+  margin-top: 1.25rem;
+}
+.comparison-card h3 {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+.comparison-table th {
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.comparison-table td {
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  vertical-align: top;
+}
+.comparison-table tr:last-child td { border-bottom: none; }
+.tag {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+}
+.tag-green { background: var(--green-glow); color: var(--green); border: 1px solid rgba(34,197,94,0.3); }
+.tag-orange { background: var(--orange-glow); color: var(--orange); border: 1px solid rgba(245,158,11,0.3); }
+.tag-blue { background: var(--accent-glow); color: var(--accent); border: 1px solid rgba(59,130,246,0.3); }
+.tag-purple { background: rgba(168,85,247,0.15); color: var(--purple); border: 1px solid rgba(168,85,247,0.3); }
+
+/* ===== ALGORITHM PANEL ===== */
+.algo-section { margin-top: 1.25rem; }
+.algo-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.algo-tab {
+  padding: 0.4rem 1rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text-muted);
+  transition: all 0.15s;
+}
+.algo-tab.active-bfs { border-color: var(--green); color: var(--green); background: var(--green-glow); }
+.algo-tab.active-ucs { border-color: var(--orange); color: var(--orange); background: var(--orange-glow); }
+.algo-tab:hover:not(.active-bfs):not(.active-ucs) { border-color: var(--border-bright); color: var(--text-dim); }
+.code-block {
+  background: #070c14;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  line-height: 1.7;
+  overflow-x: auto;
+  display: none;
+}
+.code-block.visible { display: block; }
+.kw { color: #c792ea; }
+.fn { color: #82aaff; }
+.str { color: #c3e88d; }
+.cm { color: #546e7a; font-style: italic; }
+.num { color: #f78c6c; }
+.var { color: #eeffff; }
+.op { color: #89ddff; }
+
+/* ===== INFO TOOLTIP ===== */
+#tooltip {
+  position: fixed;
+  background: var(--surface2);
+  border: 1px solid var(--border-bright);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.72rem;
+  color: var(--text);
+  pointer-events: none;
+  display: none;
+  z-index: 100;
+  max-width: 180px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+#tooltip .tt-title { font-weight: 700; margin-bottom: 0.2rem; }
+#tooltip .tt-info { color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+
+/* ===== STATUS BAR ===== */
+#status-bar {
+  margin-top: 0.75rem;
+  padding: 0.6rem 1rem;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+#status-bar::before { content: '›'; color: var(--accent); font-size: 1rem; }
+</style>
+</head>
+<body>
+
+<div id="tooltip">
+  <div class="tt-title" id="tt-title"></div>
+  <div class="tt-info" id="tt-info"></div>
+</div>
+
+<div class="wrapper">
+
+  <header>
+    <div class="header-left">
+      <h1>FAST Peshawar — <span>Campus Navigator</span></h1>
+      <p>AI & DS Problem 1 · Graph Search · BFS vs UCS</p>
+    </div>
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+      <span class="badge">BFS</span>
+      <span class="badge">UCS</span>
+      <span class="badge">Dijkstra</span>
+    </div>
+  </header>
+
+  <div class="main-grid">
+
+    <!-- LEFT: CANVAS + STATUS -->
+    <div>
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title"><span class="dot dot-blue"></span>Campus Graph — FAST Peshawar</span>
+          <span style="font-size:0.65rem;color:var(--text-muted);font-family:'JetBrains Mono',monospace;">Hover nodes for info</span>
+        </div>
+        <div id="canvas-wrap">
+          <canvas id="cvs" width="860" height="520"></canvas>
+        </div>
+      </div>
+
+      <div id="status-bar">Select START and END nodes, then run BFS or UCS to find the path.</div>
+
+      <!-- RESULTS -->
+      <div class="results-grid" id="results-grid" style="display:none;">
+        <div class="result-card" id="bfs-card">
+          <div class="result-card-header bfs">🔵 BFS — Fewest Hops</div>
+          <div class="result-body">
+            <div class="result-metric">
+              <div class="result-metric-label">Hops (Buildings)</div>
+              <div class="result-metric-value bfs" id="bfs-hops">—</div>
+            </div>
+            <div class="result-metric">
+              <div class="result-metric-label">Total Walk Time</div>
+              <div class="result-metric-value bfs" id="bfs-time">—</div>
+            </div>
+            <div class="path-steps" id="bfs-path-steps"></div>
+          </div>
+        </div>
+        <div class="result-card" id="ucs-card">
+          <div class="result-card-header ucs">🟠 UCS — Fastest Walk</div>
+          <div class="result-body">
+            <div class="result-metric">
+              <div class="result-metric-label">Hops (Buildings)</div>
+              <div class="result-metric-value ucs" id="ucs-hops">—</div>
+            </div>
+            <div class="result-metric">
+              <div class="result-metric-label">Total Walk Time</div>
+              <div class="result-metric-value ucs" id="ucs-time">—</div>
+            </div>
+            <div class="path-steps" id="ucs-path-steps"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- COMPARISON TABLE -->
+      <div class="comparison-card" id="comparison-card" style="display:none;">
+        <h3>⚡ Algorithm Comparison</h3>
+        <table class="comparison-table">
+          <thead>
+            <tr>
+              <th>Property</th>
+              <th>BFS</th>
+              <th>UCS (Dijkstra)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="color:var(--text-dim)">Optimizes for</td>
+              <td><span class="tag tag-green">Fewest hops</span></td>
+              <td><span class="tag tag-orange">Minimum cost</span></td>
+            </tr>
+            <tr>
+              <td style="color:var(--text-dim)">Edge weights</td>
+              <td><span class="tag tag-blue">Ignored</span></td>
+              <td><span class="tag tag-orange">Used (walk time)</span></td>
+            </tr>
+            <tr>
+              <td style="color:var(--text-dim)">Data structure</td>
+              <td><span class="tag tag-green">Queue (FIFO)</span></td>
+              <td><span class="tag tag-purple">Priority Queue</span></td>
+            </tr>
+            <tr>
+              <td style="color:var(--text-dim)">Complexity</td>
+              <td><span class="tag tag-blue">O(V + E)</span></td>
+              <td><span class="tag tag-blue">O((V+E) log V)</span></td>
+            </tr>
+            <tr>
+              <td style="color:var(--text-dim)">This query</td>
+              <td id="cmp-bfs-result" style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;">—</td>
+              <td id="cmp-ucs-result" style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;">—</td>
+            </tr>
+            <tr>
+              <td style="color:var(--text-dim)">Verdict</td>
+              <td colspan="2" id="verdict" style="font-size:0.78rem;color:var(--text-dim);">—</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ALGORITHM CODE -->
+      <div class="algo-section">
+        <div class="algo-tabs">
+          <div class="algo-tab active-bfs" onclick="showCode('bfs')">BFS Code</div>
+          <div class="algo-tab" onclick="showCode('ucs')">UCS Code</div>
+        </div>
+        <div class="code-block visible" id="code-bfs">
+<span class="cm"># BFS — Breadth-First Search (finds fewest hops)</span>
+<span class="kw">from</span> <span class="var">collections</span> <span class="kw">import</span> <span class="fn">deque</span>
+
+<span class="kw">def</span> <span class="fn">bfs</span>(<span class="var">graph</span>, <span class="var">start</span>, <span class="var">end</span>):
+    <span class="var">queue</span> <span class="op">=</span> <span class="fn">deque</span>([(<span class="var">start</span>, [<span class="var">start</span>])])  <span class="cm"># (node, path)</span>
+    <span class="var">visited</span> <span class="op">=</span> {<span class="var">start</span>}
+
+    <span class="kw">while</span> <span class="var">queue</span>:
+        <span class="var">node</span>, <span class="var">path</span> <span class="op">=</span> <span class="var">queue</span>.<span class="fn">popleft</span>()  <span class="cm"># FIFO</span>
+
+        <span class="kw">if</span> <span class="var">node</span> <span class="op">==</span> <span class="var">end</span>:
+            <span class="kw">return</span> <span class="var">path</span>  <span class="cm"># ✓ Fewest hops guaranteed</span>
+
+        <span class="kw">for</span> <span class="var">neighbor</span>, <span class="var">weight</span> <span class="kw">in</span> <span class="var">graph</span>[<span class="var">node</span>]:
+            <span class="kw">if</span> <span class="var">neighbor</span> <span class="op">not in</span> <span class="var">visited</span>:
+                <span class="var">visited</span>.<span class="fn">add</span>(<span class="var">neighbor</span>)
+                <span class="cm"># Weight ignored — all hops equal</span>
+                <span class="var">queue</span>.<span class="fn">append</span>((<span class="var">neighbor</span>, <span class="var">path</span> <span class="op">+</span> [<span class="var">neighbor</span>]))
+
+    <span class="kw">return</span> <span class="kw">None</span>  <span class="cm"># No path found</span>
+        </div>
+        <div class="code-block" id="code-ucs">
+<span class="cm"># UCS — Uniform Cost Search (finds minimum walk time)</span>
+<span class="kw">import</span> <span class="var">heapq</span>
+
+<span class="kw">def</span> <span class="fn">ucs</span>(<span class="var">graph</span>, <span class="var">start</span>, <span class="var">end</span>):
+    <span class="cm"># (cost, node, path)</span>
+    <span class="var">pq</span> <span class="op">=</span> [(<span class="num">0</span>, <span class="var">start</span>, [<span class="var">start</span>])]
+    <span class="var">visited</span> <span class="op">=</span> {}  <span class="cm"># node → best cost seen</span>
+
+    <span class="kw">while</span> <span class="var">pq</span>:
+        <span class="var">cost</span>, <span class="var">node</span>, <span class="var">path</span> <span class="op">=</span> <span class="var">heapq</span>.<span class="fn">heappop</span>(<span class="var">pq</span>)
+
+        <span class="kw">if</span> <span class="var">node</span> <span class="op">in</span> <span class="var">visited</span>:
+            <span class="kw">continue</span>
+        <span class="var">visited</span>[<span class="var">node</span>] <span class="op">=</span> <span class="var">cost</span>
+
+        <span class="kw">if</span> <span class="var">node</span> <span class="op">==</span> <span class="var">end</span>:
+            <span class="kw">return</span> <span class="var">path</span>, <span class="var">cost</span>  <span class="cm"># ✓ Min cost guaranteed</span>
+
+        <span class="kw">for</span> <span class="var">neighbor</span>, <span class="var">weight</span> <span class="kw">in</span> <span class="var">graph</span>[<span class="var">node</span>]:
+            <span class="kw">if</span> <span class="var">neighbor</span> <span class="op">not in</span> <span class="var">visited</span>:
+                <span class="var">new_cost</span> <span class="op">=</span> <span class="var">cost</span> <span class="op">+</span> <span class="var">weight</span>
+                <span class="var">heapq</span>.<span class="fn">heappush</span>(<span class="var">pq</span>,
+                    (<span class="var">new_cost</span>, <span class="var">neighbor</span>, <span class="var">path</span> <span class="op">+</span> [<span class="var">neighbor</span>]))
+
+    <span class="kw">return</span> <span class="kw">None</span>, <span class="var">float</span>(<span class="str">'inf'</span>)
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: CONTROLS -->
+    <div>
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title"><span class="dot dot-purple"></span>Controls</span>
+        </div>
+        <div class="controls">
+          <div class="control-row">
+            <span class="control-label">START</span>
+            <select id="sel-start">
+              <option value="">— select —</option>
+            </select>
+          </div>
+          <div class="control-row">
+            <span class="control-label">END</span>
+            <select id="sel-end">
+              <option value="">— select —</option>
+            </select>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn btn-bfs" onclick="runSearch('bfs')">▶ Run BFS</button>
+            <button class="btn btn-ucs" onclick="runSearch('ucs')">▶ Run UCS</button>
+            <button class="btn btn-both" onclick="runSearch('both')">⚡ Compare Both</button>
+            <button class="btn btn-reset" onclick="resetAll()">↺ Reset</button>
+          </div>
+        </div>
+
+        <div style="padding:0 1rem 0.25rem">
+          <div class="panel-title" style="margin-bottom:0.6rem;">Legend</div>
+        </div>
+        <div class="legend">
+          <div class="legend-item"><div class="legend-swatch" style="background:#7c3aed;"></div>Start</div>
+          <div class="legend-item"><div class="legend-swatch" style="background:#dc2626;"></div>End</div>
+          <div class="legend-item"><div class="legend-swatch" style="background:#22c55e;"></div>BFS Path</div>
+          <div class="legend-item"><div class="legend-swatch" style="background:#f59e0b;"></div>UCS Path</div>
+          <div class="legend-item"><div class="legend-swatch" style="background:#1e3a5f;border:1px solid #3b82f6;"></div>Building</div>
+          <div class="legend-item"><div class="legend-swatch" style="background:#555;"></div>Road/Path</div>
+        </div>
+        <div style="height:0.5rem;"></div>
+      </div>
+
+      <!-- GRAPH TABLE -->
+      <div class="panel" style="margin-top:1rem;">
+        <div class="panel-header">
+          <span class="panel-title"><span class="dot dot-blue"></span>Edge Weights (min)</span>
+        </div>
+        <div style="padding:0.75rem;overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:0.68rem;font-family:'JetBrains Mono',monospace;" id="edge-table">
+          </table>
+        </div>
+      </div>
+
+      <!-- ADJACENCY LIST -->
+      <div class="panel" style="margin-top:1rem;">
+        <div class="panel-header">
+          <span class="panel-title"><span class="dot dot-green"></span>Adjacency List</span>
+        </div>
+        <div style="padding:0.75rem;font-family:'JetBrains Mono',monospace;font-size:0.65rem;line-height:2;" id="adj-list">
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end main-grid -->
+</div><!-- end wrapper -->
+
+<script>
+// ============================================================
+//  CAMPUS DATA — FAST Peshawar
+// ============================================================
+const NODES = {
+  gate:    { id:'gate',    label:'Main Gate',       short:'Gate',    x:0.08, y:0.50, icon:'🚪', desc:'Main entrance, security checkpoint' },
+  parking: { id:'parking', label:'Parking Area',    short:'Parking', x:0.18, y:0.72, icon:'🅿️', desc:'Student & faculty parking lot' },
+  mosque:  { id:'mosque',  label:'Mosque',          short:'Mosque',  x:0.18, y:0.28, icon:'🕌', desc:'Campus mosque, prayer area' },
+  admin:   { id:'admin',   label:'Admin Block',     short:'Admin',   x:0.33, y:0.50, icon:'🏛️', desc:'Administrative offices, registrar' },
+  lib:     { id:'lib',     label:'Library',         short:'Library', x:0.33, y:0.20, icon:'📚', desc:'Central library, reading rooms' },
+  canteen: { id:'canteen', label:'Canteen',         short:'Canteen', x:0.33, y:0.78, icon:'🍽️', desc:'Main canteen, food court' },
+  cs:      { id:'cs',      label:'CS Block',        short:'CS',      x:0.54, y:0.30, icon:'💻', desc:'Computer Science dept, labs' },
+  ee:      { id:'ee',      label:'EE Block',        short:'EE',      x:0.54, y:0.68, icon:'⚡', desc:'Electrical Engineering dept' },
+  lab:     { id:'lab',     label:'Computer Lab',   short:'Lab',     x:0.70, y:0.18, icon:'🖥️', desc:'Main computing lab, 200+ PCs' },
+  auditorium:{ id:'auditorium',label:'Auditorium',  short:'Auditm',  x:0.70, y:0.50, icon:'🎭', desc:'Main auditorium, events hall' },
+  sports:  { id:'sports',  label:'Sports Ground',  short:'Sports',  x:0.70, y:0.82, icon:'⚽', desc:'Cricket, football ground' },
+  hostel:  { id:'hostel',  label:'Hostel',         short:'Hostel',  x:0.88, y:0.30, icon:'🏠', desc:'Student hostel block' },
+  medical: { id:'medical', label:'Medical Center', short:'Medical', x:0.88, y:0.68, icon:'🏥', desc:'Campus medical & health center' },
+};
+
+// Edges: [from, to, weight_minutes]
+const EDGES_RAW = [
+  ['gate','parking',  2],
+  ['gate','mosque',   2],
+  ['gate','admin',    4],
+  ['parking','canteen', 3],
+  ['parking','ee',    5],
+  ['mosque','lib',    3],
+  ['mosque','admin',  3],
+  ['admin','lib',     4],
+  ['admin','canteen', 3],
+  ['admin','cs',      5],
+  ['admin','ee',      6],
+  ['lib','cs',        4],
+  ['canteen','ee',    4],
+  ['canteen','sports',5],
+  ['cs','lab',        3],
+  ['cs','auditorium', 4],
+  ['ee','auditorium', 4],
+  ['ee','sports',     4],
+  ['lab','hostel',    4],
+  ['lab','auditorium',3],
+  ['auditorium','hostel', 5],
+  ['auditorium','medical',4],
+  ['sports','medical',5],
+  ['hostel','medical',6],
+];
+
+// Build adjacency list
+const graph = {};
+Object.keys(NODES).forEach(n => graph[n] = []);
+EDGES_RAW.forEach(([a, b, w]) => {
+  graph[a].push([b, w]);
+  graph[b].push([a, w]);
+});
+
+// ============================================================
+//  CANVAS SETUP
+// ============================================================
+const canvas = document.getElementById('cvs');
+const ctx = canvas.getContext('2d');
+let W, H;
+let bfsPath = [], ucsPath = [], bfsCost = 0, ucsCost = 0;
+let startNode = '', endNode = '';
+let activeMode = ''; // 'bfs', 'ucs', 'both'
+
+function resize() {
+  const wrap = document.getElementById('canvas-wrap');
+  W = wrap.clientWidth;
+  H = Math.round(W * 0.6);
+  canvas.width = W;
+  canvas.height = H;
+  draw();
+}
+
+function nodePos(n) {
+  return { x: NODES[n].x * W, y: NODES[n].y * H };
+}
+
+// ============================================================
+//  DRAWING
+// ============================================================
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+
+  // Background
+  const grad = ctx.createRadialGradient(W*0.5, H*0.5, 0, W*0.5, H*0.5, W*0.7);
+  grad.addColorStop(0, '#0d1420');
+  grad.addColorStop(1, '#070c14');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Draw edges
+  EDGES_RAW.forEach(([a, b, w]) => {
+    const pa = nodePos(a), pb = nodePos(b);
+    const inBFS = isEdgeInPath(a, b, bfsPath);
+    const inUCS = isEdgeInPath(a, b, ucsPath);
+
+    ctx.beginPath();
+    ctx.moveTo(pa.x, pa.y);
+    ctx.lineTo(pb.x, pb.y);
+
+    if (activeMode === 'both' && inBFS && inUCS) {
+      // Shared path — draw two parallel lines
+      drawParallelEdge(pa, pb, '#22c55e', '#f59e0b');
+    } else if (inBFS && (activeMode === 'bfs' || activeMode === 'both')) {
+      ctx.strokeStyle = '#22c55e';
+      ctx.lineWidth = 3.5;
+      ctx.setLineDash([]);
+      ctx.shadowColor = '#22c55e';
+      ctx.shadowBlur = 10;
+      ctx.stroke();
+    } else if (inUCS && (activeMode === 'ucs' || activeMode === 'both')) {
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 3.5;
+      ctx.setLineDash([]);
+      ctx.shadowColor = '#f59e0b';
+      ctx.shadowBlur = 10;
+      ctx.stroke();
+    } else {
+      ctx.strokeStyle = '#1f2d45';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 4]);
+      ctx.shadowBlur = 0;
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    ctx.shadowBlur = 0;
+
+    // Edge weight label
+    const mx = (pa.x + pb.x) / 2, my = (pa.y + pb.y) / 2;
+    ctx.font = `bold ${Math.round(W*0.012)}px JetBrains Mono`;
+    ctx.fillStyle = (inBFS || inUCS) ? '#e2e8f0' : '#2e4068';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // White pill bg for labels
+    const tw = ctx.measureText(w+'m').width + 8;
+    ctx.fillStyle = '#0b0f1a';
+    roundRect(ctx, mx - tw/2, my - 8, tw, 16, 4);
+    ctx.fill();
+    ctx.fillStyle = (inBFS || inUCS) ? '#94a3b8' : '#2e4068';
+    ctx.fillText(w+'m', mx, my);
+  });
+
+  // Draw nodes
+  const R = Math.round(W * 0.038);
+  Object.keys(NODES).forEach(id => {
+    const n = NODES[id];
+    const { x, y } = nodePos(id);
+    const isStart = id === startNode;
+    const isEnd = id === endNode;
+    const inBFS = bfsPath.includes(id) && (activeMode === 'bfs' || activeMode === 'both');
+    const inUCS = ucsPath.includes(id) && (activeMode === 'ucs' || activeMode === 'both');
+
+    // Glow
+    if (isStart || isEnd || inBFS || inUCS) {
+      ctx.beginPath();
+      ctx.arc(x, y, R + 10, 0, Math.PI * 2);
+      let glowCol = isStart ? 'rgba(124,58,237,0.3)'
+                  : isEnd   ? 'rgba(220,38,38,0.3)'
+                  : (inBFS && inUCS && activeMode==='both') ? 'rgba(100,200,100,0.3)'
+                  : inBFS   ? 'rgba(34,197,94,0.3)'
+                  : 'rgba(245,158,11,0.3)';
+      ctx.fillStyle = glowCol;
+      ctx.fill();
+    }
+
+    // Node circle
+    ctx.beginPath();
+    ctx.arc(x, y, R, 0, Math.PI * 2);
+
+    let fill = '#1e3a5f';
+    let stroke = '#3b82f6';
+    let strokeW = 1.5;
+    if (isStart)  { fill = '#3b1a6e'; stroke = '#a855f7'; strokeW = 2.5; }
+    if (isEnd)    { fill = '#5e1a1a'; stroke = '#ef4444'; strokeW = 2.5; }
+    if (inBFS && !isStart && !isEnd && activeMode !== 'both') { fill = '#1e4d2b'; stroke = '#22c55e'; strokeW = 2; }
+    if (inUCS && !isStart && !isEnd && activeMode !== 'both') { fill = '#4d2b1e'; stroke = '#f59e0b'; strokeW = 2; }
+    if (inBFS && inUCS && activeMode === 'both' && !isStart && !isEnd) {
+      fill = '#2b3d1e'; stroke = '#86efac'; strokeW = 2;
+    }
+
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = strokeW;
+    ctx.stroke();
+
+    // Icon
+    const iconSize = Math.round(R * 0.85);
+    ctx.font = `${iconSize}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fff';
+    ctx.fillText(n.icon, x, y - 1);
+
+    // Label
+    const lblSize = Math.max(9, Math.round(W * 0.011));
+    ctx.font = `600 ${lblSize}px Space Grotesk`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    const lbl = n.short;
+    const lw = ctx.measureText(lbl).width + 10;
+
+    ctx.fillStyle = 'rgba(7,12,20,0.85)';
+    roundRect(ctx, x - lw/2, y + R + 3, lw, lblSize + 5, 3);
+    ctx.fill();
+
+    ctx.fillStyle = isStart ? '#c4b5fd'
+                 : isEnd   ? '#fca5a5'
+                 : (inBFS || inUCS) ? '#e2e8f0'
+                 : '#64748b';
+    ctx.fillText(lbl, x, y + R + 5);
+  });
+}
+
+function drawParallelEdge(pa, pb, col1, col2) {
+  const dx = pb.x - pa.x, dy = pb.y - pa.y;
+  const len = Math.sqrt(dx*dx + dy*dy);
+  const nx = -dy/len * 3, ny = dx/len * 3;
+
+  [col1, col2].forEach((col, i) => {
+    const sign = i === 0 ? 1 : -1;
+    ctx.beginPath();
+    ctx.moveTo(pa.x + nx*sign, pa.y + ny*sign);
+    ctx.lineTo(pb.x + nx*sign, pb.y + ny*sign);
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 2.5;
+    ctx.shadowColor = col;
+    ctx.shadowBlur = 8;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  });
+}
+
+function isEdgeInPath(a, b, path) {
+  for (let i = 0; i < path.length - 1; i++) {
+    if ((path[i]===a && path[i+1]===b) || (path[i]===b && path[i+1]===a)) return true;
+  }
+  return false;
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.lineTo(x+w-r, y);
+  ctx.quadraticCurveTo(x+w, y, x+w, y+r);
+  ctx.lineTo(x+w, y+h-r);
+  ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+  ctx.lineTo(x+r, y+h);
+  ctx.quadraticCurveTo(x, y+h, x, y+h-r);
+  ctx.lineTo(x, y+r);
+  ctx.quadraticCurveTo(x, y, x+r, y);
+  ctx.closePath();
+}
+
+// ============================================================
+//  ALGORITHMS
+// ============================================================
+function bfs(start, end) {
+  const queue = [[start, [start]]];
+  const visited = new Set([start]);
+  while (queue.length) {
+    const [node, path] = queue.shift();
+    if (node === end) return path;
+    for (const [nb, w] of graph[node]) {
+      if (!visited.has(nb)) {
+        visited.add(nb);
+        queue.push([nb, [...path, nb]]);
+      }
+    }
+  }
+  return null;
+}
+
+function ucs(start, end) {
+  // Min-heap: [cost, node, path]
+  const pq = [[0, start, [start]]];
+  const visited = {};
+  while (pq.length) {
+    pq.sort((a,b) => a[0]-b[0]);
+    const [cost, node, path] = pq.shift();
+    if (visited[node] !== undefined) continue;
+    visited[node] = cost;
+    if (node === end) return [path, cost];
+    for (const [nb, w] of graph[node]) {
+      if (visited[nb] === undefined) {
+        pq.push([cost + w, nb, [...path, nb]]);
+      }
+    }
+  }
+  return [null, Infinity];
+}
+
+function pathCost(path) {
+  let c = 0;
+  for (let i = 0; i < path.length - 1; i++) {
+    const edge = EDGES_RAW.find(([a,b])=>
+      (a===path[i]&&b===path[i+1])||(b===path[i]&&a===path[i+1]));
+    if (edge) c += edge[2];
+  }
+  return c;
+}
+
+// ============================================================
+//  UI
+// ============================================================
+function runSearch(mode) {
+  startNode = document.getElementById('sel-start').value;
+  endNode   = document.getElementById('sel-end').value;
+
+  if (!startNode || !endNode) {
+    setStatus('⚠ Please select both START and END nodes.', 'var(--red)');
+    return;
+  }
+  if (startNode === endNode) {
+    setStatus('⚠ Start and End cannot be the same building.', 'var(--red)');
+    return;
+  }
+
+  activeMode = mode;
+
+  if (mode === 'bfs' || mode === 'both') {
+    bfsPath = bfs(startNode, endNode) || [];
+    bfsCost = pathCost(bfsPath);
+  }
+  if (mode === 'ucs' || mode === 'both') {
+    const [p, c] = ucs(startNode, endNode);
+    ucsPath = p || [];
+    ucsCost = c;
+  }
+
+  draw();
+  showResults(mode);
+
+  const sLabel = NODES[startNode].label;
+  const eLabel = NODES[endNode].label;
+  setStatus(`✓ ${mode.toUpperCase()} complete: ${sLabel} → ${eLabel}`, 'var(--green)');
+}
+
+function showResults(mode) {
+  document.getElementById('results-grid').style.display = 'grid';
+  document.getElementById('comparison-card').style.display = 'block';
+
+  if (mode === 'bfs' || mode === 'both') {
+    document.getElementById('bfs-hops').textContent = bfsPath.length ? `${bfsPath.length - 1} hops` : 'No path';
+    document.getElementById('bfs-time').textContent = bfsPath.length ? `${bfsCost} min` : '—';
+    document.getElementById('bfs-path-steps').innerHTML =
+      bfsPath.map(n => `<div class="path-step">${NODES[n].icon} ${NODES[n].label}</div>`).join('');
+  }
+
+  if (mode === 'ucs' || mode === 'both') {
+    document.getElementById('ucs-hops').textContent = ucsPath.length ? `${ucsPath.length - 1} hops` : 'No path';
+    document.getElementById('ucs-time').textContent = ucsPath.length ? `${ucsCost} min` : '—';
+    document.getElementById('ucs-path-steps').innerHTML =
+      ucsPath.map(n => `<div class="path-step">${NODES[n].icon} ${NODES[n].label}</div>`).join('');
+  }
+
+  // Comparison
+  if (mode === 'both' && bfsPath.length && ucsPath.length) {
+    const sameRoute = JSON.stringify(bfsPath) === JSON.stringify(ucsPath);
+    document.getElementById('cmp-bfs-result').innerHTML =
+      `<span class="tag tag-green">${bfsPath.length-1} hops, ${bfsCost}min</span>`;
+    document.getElementById('cmp-ucs-result').innerHTML =
+      `<span class="tag tag-orange">${ucsPath.length-1} hops, ${ucsCost}min</span>`;
+
+    let verdict = '';
+    if (sameRoute) {
+      verdict = `✅ Both found the <strong>same path</strong>! When the shortest hop path also has the lowest cost, BFS and UCS agree.`;
+    } else if (bfsCost < ucsCost) {
+      verdict = `⚠️ Interesting! BFS found a route with fewer hops (${bfsPath.length-1}) that also takes less time (${bfsCost}min). BFS wins here.`;
+    } else if (ucsCost < bfsCost) {
+      verdict = `🔍 <strong>Paths differ!</strong> BFS takes fewer hops (${bfsPath.length-1}) but more time (${bfsCost}min). UCS found a longer route (${ucsPath.length-1} hops) that saves ${bfsCost-ucsCost} min — proving UCS is better for time-optimal navigation.`;
+    }
+    document.getElementById('verdict').innerHTML = verdict;
+  }
+}
+
+function resetAll() {
+  bfsPath = []; ucsPath = []; bfsCost = 0; ucsCost = 0;
+  startNode = ''; endNode = '';
+  activeMode = '';
+  document.getElementById('sel-start').value = '';
+  document.getElementById('sel-end').value = '';
+  document.getElementById('results-grid').style.display = 'none';
+  document.getElementById('comparison-card').style.display = 'none';
+  setStatus('Canvas reset. Select start and end nodes to begin.');
+  draw();
+}
+
+function setStatus(msg, color) {
+  const bar = document.getElementById('status-bar');
+  bar.textContent = msg;
+  bar.style.color = color || 'var(--text-dim)';
+}
+
+function showCode(tab) {
+  document.querySelectorAll('.code-block').forEach(el => el.classList.remove('visible'));
+  document.querySelectorAll('.algo-tab').forEach(el => {
+    el.classList.remove('active-bfs','active-ucs');
+  });
+  document.getElementById(`code-${tab}`).classList.add('visible');
+  document.querySelectorAll('.algo-tab').forEach((el, i) => {
+    if ((tab === 'bfs' && i === 0) || (tab === 'ucs' && i === 1)) {
+      el.classList.add(tab === 'bfs' ? 'active-bfs' : 'active-ucs');
+    }
+  });
+}
+
+// ============================================================
+//  POPULATE SELECTS & TABLES
+// ============================================================
+function populateUI() {
+  const ids = Object.keys(NODES);
+  ['sel-start','sel-end'].forEach(selId => {
+    const sel = document.getElementById(selId);
+    ids.forEach(id => {
+      const opt = document.createElement('option');
+      opt.value = id;
+      opt.textContent = `${NODES[id].icon} ${NODES[id].label}`;
+      sel.appendChild(opt);
+    });
+  });
+
+  // Edge table
+  const tbl = document.getElementById('edge-table');
+  tbl.innerHTML = `<thead><tr>
+    <th style="color:var(--text-muted);padding:0.3rem 0.4rem;border-bottom:1px solid var(--border);">From</th>
+    <th style="color:var(--text-muted);padding:0.3rem 0.4rem;border-bottom:1px solid var(--border);">To</th>
+    <th style="color:var(--accent);padding:0.3rem 0.4rem;border-bottom:1px solid var(--border);text-align:right;">Min</th>
+  </tr></thead>`;
+  const tbody = document.createElement('tbody');
+  EDGES_RAW.forEach(([a,b,w]) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="padding:0.25rem 0.4rem;color:var(--text-dim);border-bottom:1px solid rgba(255,255,255,0.03);">${NODES[a].icon} ${NODES[a].short}</td>
+      <td style="padding:0.25rem 0.4rem;color:var(--text-dim);border-bottom:1px solid rgba(255,255,255,0.03);">${NODES[b].icon} ${NODES[b].short}</td>
+      <td style="padding:0.25rem 0.4rem;text-align:right;color:var(--cyan);border-bottom:1px solid rgba(255,255,255,0.03);">${w}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+  tbl.appendChild(tbody);
+
+  // Adjacency list
+  const adjDiv = document.getElementById('adj-list');
+  adjDiv.innerHTML = Object.entries(graph).map(([n, edges]) =>
+    `<div style="margin-bottom:0.3rem;">
+      <span style="color:var(--accent);">${NODES[n].short}</span>
+      <span style="color:var(--text-muted);">: [</span>
+      ${edges.map(([nb,w]) => `<span style="color:var(--green);">${NODES[nb].short}</span><span style="color:var(--text-muted);">(${w})</span>`).join('<span style="color:var(--text-muted);">, </span>')}
+      <span style="color:var(--text-muted);">]</span>
+    </div>`
+  ).join('');
+}
+
+// ============================================================
+//  HOVER TOOLTIP
+// ============================================================
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = (e.clientX - rect.left) * (canvas.width / rect.width);
+  const my = (e.clientY - rect.top)  * (canvas.height / rect.height);
+  const R = W * 0.038;
+  const tip = document.getElementById('tooltip');
+
+  let found = false;
+  Object.keys(NODES).forEach(id => {
+    const { x, y } = nodePos(id);
+    const dist = Math.hypot(mx-x, my-y);
+    if (dist < R + 5) {
+      found = true;
+      const n = NODES[id];
+      document.getElementById('tt-title').textContent = `${n.icon} ${n.label}`;
+      document.getElementById('tt-info').textContent = n.desc;
+      tip.style.display = 'block';
+      tip.style.left = (e.clientX + 14) + 'px';
+      tip.style.top  = (e.clientY - 10) + 'px';
+    }
+  });
+  if (!found) tip.style.display = 'none';
+});
+canvas.addEventListener('mouseleave', () => {
+  document.getElementById('tooltip').style.display = 'none';
+});
+
+// Click to select start/end
+canvas.addEventListener('click', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = (e.clientX - rect.left) * (canvas.width / rect.width);
+  const my = (e.clientY - rect.top)  * (canvas.height / rect.height);
+  const R = W * 0.038;
+
+  Object.keys(NODES).forEach(id => {
+    const { x, y } = nodePos(id);
+    if (Math.hypot(mx-x, my-y) < R + 5) {
+      const ss = document.getElementById('sel-start');
+      const se = document.getElementById('sel-end');
+      if (!ss.value || ss.value === id) {
+        ss.value = id;
+      } else if (!se.value || se.value === id) {
+        se.value = id;
+      } else {
+        ss.value = id;
+        se.value = '';
+      }
+      draw();
+    }
+  });
+});
+
+// ============================================================
+//  INIT
+// ============================================================
+populateUI();
+window.addEventListener('resize', resize);
+resize();
+</script>
+</body>
+</html>
